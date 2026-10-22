@@ -1,0 +1,8 @@
+The single most effective, low-effort anomaly to start with is the "Pure Cash Drain" (Zero Merchant Spend + Rapid Depletion).Why This One WorksLegitimate travelers and everyday domestic consumers use their debit cards for regular life—gas, coffee, groceries, hotels, rideshares, and retail.Money mules and cash-out operations treat the debit card as a one-way siphon: funds land, and 100% of the card activity is cash leaving an ATM, with exactly $0.00 in Point-of-Sale (POS) merchant transactions. Filtering for this pattern instantly strips out 99% of normal consumer noise without needing complex statistical modeling or geographic lookups.The Anomaly DefinitionIsolate accounts over a rolling 30-day window (or calendar month) meeting three basic conditions:ATM Cash Withdrawn: $\ge \$2,000$ (or $\ge 3$ cash withdrawals)POS / Merchant Spend: Exactly $\$0.00$Cash-to-Deposit Drain Ratio: Cash withdrawals account for $\ge 80\%$ of all incoming funds during that period.Implementation (Direct T-SQL)Run this single query across your Fact_Debit_Card_Txn and Fact_Deposit_Txn_History tables. It calculates total ATM cash against total merchant POS spend per account per month:
+
+Verification Checklist
+Execute the query above against your database or local extract to get a tight candidate list of accounts.
+
+Spot-check the top 3 accounts: Pull up the full debit ledger for the highest Total_ATM_Cash hit. Verify whether the card was used exclusively at standalone ATMs.
+
+Inspect the funding source: Look at where the money came from right before the ATM run—if it's a mobile check deposit or quick peer-to-peer transfer that cleared hours before the cash was pulled, you have captured your first live fraud/AML candidate.

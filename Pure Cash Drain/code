@@ -1,0 +1,39 @@
+WITH CardMonthlyActivity AS (
+    SELECT 
+        Account_Key,
+        FORMAT(Txn_Timestamp, 'yyyy-MM') AS Activity_Month,
+        -- Cash pulled via ATM (MCC 6011)
+        SUM(CASE WHEN MCC = '6011' THEN Amount ELSE 0 END) AS Total_ATM_Cash,
+        COUNT(CASE WHEN MCC = '6011' THEN 1 END) AS ATM_Txn_Count,
+        -- Normal retail/merchant spend (MCC <> 6011)
+        SUM(CASE WHEN MCC <> '6011' THEN Amount ELSE 0 END) AS Total_POS_Spend
+    FROM Fact_Debit_Card_Txn
+    WHERE Txn_Timestamp >= DATEADD(month, -12, GETDATE())
+    GROUP BY Account_Key, FORMAT(Txn_Timestamp, 'yyyy-MM')
+),
+DepositMonthlyActivity AS (
+    SELECT 
+        Account_Key,
+        FORMAT(Txn_Date, 'yyyy-MM') AS Activity_Month,
+        SUM(Deposit_Amount) AS Total_Deposits
+    FROM Fact_Deposit_Txn_History
+    WHERE Txn_Date >= DATEADD(month, -12, GETDATE())
+    GROUP BY Account_Key, FORMAT(Txn_Date, 'yyyy-MM')
+)
+SELECT 
+    c.Account_Key,
+    c.Activity_Month,
+    c.ATM_Txn_Count,
+    c.Total_ATM_Cash,
+    c.Total_POS_Spend,
+    COALESCE(d.Total_Deposits, 0) AS Total_Deposits,
+    ROUND(c.Total_ATM_Cash / NULLIF(d.Total_Deposits, 0), 2) AS Cash_Drain_Ratio
+FROM CardMonthlyActivity c
+LEFT JOIN DepositMonthlyActivity d
+    ON c.Account_Key = d.Account_Key 
+   AND c.Activity_Month = d.Activity_Month
+WHERE 
+    c.Total_ATM_Cash >= 2000
+    AND c.Total_POS_Spend = 0
+    AND (d.Total_Deposits IS NULL OR (c.Total_ATM_Cash / NULLIF(d.Total_Deposits, 0)) >= 0.80)
+ORDER BY c.Total_ATM_Cash DESC;
